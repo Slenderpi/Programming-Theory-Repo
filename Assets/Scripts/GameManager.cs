@@ -31,6 +31,7 @@ public class GameManager : MonoBehaviour {
 		if (SceneManager.GetActiveScene().name == "IngameScene") {
 			StartGame(); // Force start
 		}
+		SceneManager.sceneLoaded += SetManagersAndStartGame;
 	}
 
 	// Update is called once per frame
@@ -41,23 +42,24 @@ public class GameManager : MonoBehaviour {
 	public void StartGame() {
 		// TODO
 		isGameOver = false;
-		SceneManager.LoadScene("IngameScene");
-		StartCoroutine(SetManagersAndStartGame());
+		SceneManager.LoadScene("IngameScene", LoadSceneMode.Single);
 	}
 
-	IEnumerator SetManagersAndStartGame() {
-		GameObject player, spawner;
+	void SetManagersAndStartGame(Scene scene, LoadSceneMode mode) {
+		GameObject player = null;
+		GameObject spawner = null;
 		do {
-			player = GameObject.Find("Player");
-			spawner = GameObject.Find("SpawnManager");
-			yield return new WaitForEndOfFrame();
+			GameObject p = GameObject.Find("Player");
+			if (player != p) player = p;
+			else print("INCORRECT PLAYER FOUND");
+			GameObject s = GameObject.Find("SpawnManager");
+			if (spawner != s) spawner = s;
 		} while (player == null || spawner == null);
 		pm = player.GetComponent<PlayerManager>();
 		sm = spawner.GetComponent<SpawnManager>();
 
 		isGameStarted = true;
 
-		yield return new WaitForSeconds(1);
 		pm.StartMoving();
 		sm.StartSpawning();
 	}

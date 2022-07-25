@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class HurtOnTouch : MonoBehaviour {
 
+	public bool isInstakill = false;
+
 	PlayerManager pm;
 
 	bool hasTouched = false;
@@ -15,7 +17,7 @@ public class HurtOnTouch : MonoBehaviour {
 	private void OnTriggerEnter(Collider other) {
 		if (!hasTouched && other.CompareTag("Player")) {
 			hasTouched = true;
-			pm.IncreaseHealth(-1);
+			pm.IncreaseHealth(-1, isInstakill);
 		}
 	}
 

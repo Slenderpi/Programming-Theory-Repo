@@ -4,10 +4,10 @@ using UnityEngine;
 
 public class PointPowerup : Powerup {
 
-	int pointValue = 10;
+	int gemValue = 1;
 
 	protected override void OnCollectPowerup() {
-		pm.IncreasePoints(pointValue);
+		pm.IncreaseGemCount(gemValue);
 	}
 
 }
