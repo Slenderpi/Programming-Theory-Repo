@@ -10,8 +10,14 @@ public class GameManager : MonoBehaviour {
 	PlayerManager pm;
 	SpawnManager sm;
 
+	//public AudioSource asource { get; private set; }
+	AudioSource asource;
+
 	public bool isGameOver { get; private set; }
 	public bool isGameStarted { get; private set; }
+
+	public AudioClip startSound;
+	public AudioClip gameMusic;
 
 	private void Awake() {
 		if (instance) {
@@ -26,8 +32,8 @@ public class GameManager : MonoBehaviour {
 	void Start() {
 		isGameOver = false;
 		isGameStarted = false;
-		//pm = GameObject.Find("Player").GetComponent<PlayerManager>();
-		//sm = GameObject.Find("SpawnManager").GetComponent<SpawnManager>();
+		asource = GetComponent<AudioSource>();
+
 		if (SceneManager.GetActiveScene().name == "IngameScene") {
 			StartGame(); // Force start
 		}
@@ -41,6 +47,7 @@ public class GameManager : MonoBehaviour {
 
 	public void StartGame() {
 		// TODO
+		asource.PlayOneShot(startSound);
 		isGameOver = false;
 		SceneManager.LoadScene("IngameScene", LoadSceneMode.Single);
 	}
@@ -72,6 +79,10 @@ public class GameManager : MonoBehaviour {
 
 	public PlayerManager GetPlayerManager() {
 		return pm;
+	}
+
+	public AudioSource GetAudioSource() {
+		return asource;
 	}
 
 }

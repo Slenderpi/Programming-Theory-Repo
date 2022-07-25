@@ -52,6 +52,11 @@ public class PlayerManager : MonoBehaviour {
 	public ParticleSystem obtainInvincibilityParticleExplosion;
 	public ParticleSystem obtainGemParticleExplosion;
 
+	public AudioClip gemCollectSound;
+	public AudioClip healthObtainedSound;
+	public AudioClip invincibilityObtainedSound;
+	public AudioClip hurtSound;
+
 	public int health = 3;
 	public int gemsCollected { get; private set; }
 
@@ -136,6 +141,7 @@ public class PlayerManager : MonoBehaviour {
 	IEnumerator StartInvincibilityTimer() {
 		isInvincible = true;
 		obtainInvincibilityParticleExplosion.Play();
+		GameManager.instance.GetAudioSource().PlayOneShot(invincibilityObtainedSound);
 		foreach (GameObject indicator in invincibilityIndicators) {
 			indicator.SetActive(true);
 		}
@@ -154,9 +160,10 @@ public class PlayerManager : MonoBehaviour {
 
 	public void IncreaseHealth(int amnt, bool isInstaKill = false) {
 		if (health > 0 && (amnt > 0 || !isInvincible)) {
-			if (isInstaKill)
+			if (isInstaKill) {
 				health = 0;
-			else {
+				GameManager.instance.GetAudioSource().PlayOneShot(hurtSound);
+			} else {
 				if (amnt < 0) {
 #if DEBUG_DAMAGE_VELOCITY_REDUCTION
 					// IDK HOW TO TO DO MATH. Speed reduction calculations will be assuming sppedReduction is 0.5f
@@ -191,14 +198,14 @@ public class PlayerManager : MonoBehaviour {
 					horizontalMoveSpeed = startingHorizontalSpeed + acceleration * horizontalAccelerationProportion * (u - timeUntilAccelerationStart);
 					timeElapsedV = u;
 #endif
-					if (forwardVelocity < startingForwardSpeed) {
+					if (forwardVelocity < startingForwardSpeed)
 						forwardVelocity = startingForwardSpeed;
-					}
-					if (horizontalMoveSpeed < startingHorizontalSpeed) {
+					if (horizontalMoveSpeed < startingHorizontalSpeed)
 						horizontalMoveSpeed = startingHorizontalSpeed;
-					}
+					GameManager.instance.GetAudioSource().PlayOneShot(hurtSound);
 				} else {
 					obtainHealthParticleExplosion.Play();
+					GameManager.instance.GetAudioSource().PlayOneShot(healthObtainedSound);
 				}
 				health += amnt;
 			}
@@ -230,6 +237,7 @@ public class PlayerManager : MonoBehaviour {
 		gemsCollected += amnt;
 		pointsText.text = $"Gems: {gemsCollected}";
 		obtainGemParticleExplosion.Play();
+		GameManager.instance.GetAudioSource().PlayOneShot(gemCollectSound);
 	}
 
 	IEnumerator PanCameraBackward() {
