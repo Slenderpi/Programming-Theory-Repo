@@ -19,12 +19,15 @@ public class GameManager : MonoBehaviour {
 	public AudioClip startSound;
 	public AudioClip gameMusic;
 
+	public GameObject ingameMusicPlayerObject;
+
 	private void Awake() {
 		if (instance) {
 			Destroy(gameObject);
 		} else {
 			instance = this;
 			DontDestroyOnLoad(gameObject);
+			DontDestroyOnLoad(ingameMusicPlayerObject);
 		}
 	}
 
@@ -33,6 +36,12 @@ public class GameManager : MonoBehaviour {
 		isGameOver = false;
 		isGameStarted = false;
 		asource = GetComponent<AudioSource>();
+
+		AudioSource ingameASource = ingameMusicPlayerObject.GetComponent<AudioSource>();
+		ingameASource.loop = true;
+		ingameASource.clip = gameMusic;
+		ingameASource.volume = asource.volume * 0.6f;
+		ingameASource.Play();
 
 		if (SceneManager.GetActiveScene().name == "IngameScene") {
 			StartGame(); // Force start
@@ -47,7 +56,7 @@ public class GameManager : MonoBehaviour {
 
 	public void StartGame() {
 		// TODO
-		asource.PlayOneShot(startSound);
+		asource.PlayOneShot(startSound, 1.4f);
 		isGameOver = false;
 		SceneManager.LoadScene("IngameScene", LoadSceneMode.Single);
 	}
@@ -73,7 +82,6 @@ public class GameManager : MonoBehaviour {
 
 	public void GameOver() {
 		isGameOver = true;
-		print("Game over!");
 		sm.OnGameOver();
 	}
 

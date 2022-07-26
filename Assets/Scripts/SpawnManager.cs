@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class SpawnManager : MonoBehaviour {
 
-	public GameObject[] animals;
+	public GameObject[] obstacles;
 
 	public GameObject[] powerups;
 
@@ -12,15 +12,15 @@ public class SpawnManager : MonoBehaviour {
 
 	float startingAnimalSpawnDelay = 3.5f;
 	float animalSpawnDelay;
-	float minAnimalSpawnDelay = 0.3f;
-	float animalSpawnDelayOffset = 0.2f;
+	float minAnimalSpawnDelay = 0.10f;
+	float animalSpawnDelayOffset = 0.07f;
 
-	float powerupSpawnDelay = 1f;
+	float powerupSpawnDelay = 0.8f;
 	float powerupSpawnDelayOffset = 0.2f;
 	float chancePowerupIsGem = 0.9f;
 
 	int difficultyLevel = 1;
-	float difficultyIncreaseDelay = 8;
+	float difficultyIncreaseDelay = 5f;
 
 	float spawnRangeX = 30f;
 	float spawnZ;
@@ -59,7 +59,7 @@ public class SpawnManager : MonoBehaviour {
 		float currSpawnDelay = 0;
 		while (true) {
 			yield return new WaitForSeconds(currSpawnDelay);
-			GameObject animalToSpawn = animals[Random.Range(0, difficultyLevel)];
+			GameObject animalToSpawn = obstacles[Random.Range(0, difficultyLevel)];
 			Instantiate(animalToSpawn, new Vector3(Random.Range(-spawnRangeX, spawnRangeX) + pm.horizontalVelocity, 0.05f, spawnZ), animalToSpawn.transform.rotation);
 			currSpawnDelay = Random.Range(animalSpawnDelay - animalSpawnDelayOffset, animalSpawnDelay + animalSpawnDelayOffset);
 		}
@@ -81,9 +81,10 @@ public class SpawnManager : MonoBehaviour {
 
 	IEnumerator IncreaseDifficulty() {
 		yield return new WaitForSeconds(3);
-		for (int i = 0; i < animals.Length - 1; i++) {
+		for (int i = 0; i < obstacles.Length - 1; i++) {
 			yield return new WaitForSeconds(difficultyIncreaseDelay);
-			animalSpawnDelay = startingAnimalSpawnDelay - difficultyLevel++ / (animals.Length - 1) * (startingAnimalSpawnDelay - minAnimalSpawnDelay);
+			animalSpawnDelay = startingAnimalSpawnDelay - difficultyLevel++ * 1f / (obstacles.Length - 1) * (startingAnimalSpawnDelay - minAnimalSpawnDelay);
+			//print($"DifficultY: {difficultyLevel}\nSpawn delay: {animalSpawnDelay}\n{startingAnimalSpawnDelay} - {difficultyLevel - 1} / {obstacles.Length} - 1 * ({startingAnimalSpawnDelay} - {minAnimalSpawnDelay})");
 		}
 		increaseDifficultyCoroutine = null;
 		maxedDifficulty = true;

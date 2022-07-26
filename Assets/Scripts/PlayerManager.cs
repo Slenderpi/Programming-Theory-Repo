@@ -17,14 +17,16 @@ public class PlayerManager : MonoBehaviour {
 	[SerializeField]
 	float horizontalMoveSpeed;
 	float startingForwardSpeed = 5f;
-	[SerializeField]
-	public float forwardVel = 0;
 
-	float startingAcceleration = 0.35f;
+	float startingAcceleration = 0.425f;
 	float acceleration; // Leave starting at 0
-	float horizontalAccelerationProportion = 0.35f; // Proportion of forward acceleration the horizontal acceleration will have
+	float horizontalAccelerationProportion = 0.45f; // Proportion of forward acceleration the horizontal acceleration will have
 	float timeUntilAccelerationStart = 10f;
 	float hurtSpeedReduction = 0.5f; // FONKY MATH please leave at 0.5f :))) ~~A value of 0.6f means forwardVelocity is set to forwardVelocity * 0.6f after getting hurt~~
+	float recoveryVelocityProportion = 0.3f; // Recover this fraction of the velocity lost
+	float recoveryDuration = 10f;
+	Coroutine recoveryCoroutine;
+	Coroutine redfadeCoroutine;
 
 	float maxInvincibilityTime = 10;
 	Coroutine invincibilityCoroutine;
@@ -34,12 +36,16 @@ public class PlayerManager : MonoBehaviour {
 	float timeElapsedV = 0; // Exists solely for player hurt velocity calculations. Read multiline comment within IncreaseHealth() for more info
 	float distanceTraveled = 0;
 
+	float topSpeed = 0f;
+
 	bool isPaused = false;
 
 	public TextMeshProUGUI healthText;
 	public TextMeshProUGUI pointsText;
+	public TextMeshProUGUI topSpeedText;
 	public TextMeshProUGUI timeElapsedText;
 	public TextMeshProUGUI distanceTraveledText;
+	public TextMeshProUGUI currentSpeedText;
 	public GameObject pausePanel;
 	public GameObject gameoverPanel;
 	public TextMeshProUGUI gameoverGemsText;
@@ -72,6 +78,7 @@ public class PlayerManager : MonoBehaviour {
 		pointsText.gameObject.SetActive(false);
 		timeElapsedText.gameObject.SetActive(false);
 		distanceTraveledText.gameObject.SetActive(false);
+		currentSpeedText.gameObject.SetActive(false);
 		pausePanel.SetActive(false);
 		gameoverPanel.SetActive(false);
 
@@ -85,8 +92,6 @@ public class PlayerManager : MonoBehaviour {
 		horizontalInput = Input.GetAxis("Horizontal");
 
 		forwardVelocity += acceleration * Time.deltaTime;
-
-		forwardVel = forwardVelocity; // For debug reasons
 
 		horizontalVelocity = horizontalMoveSpeed * horizontalInput;
 		horizontalMoveSpeed += acceleration * horizontalAccelerationProportion * Time.deltaTime;
@@ -102,6 +107,7 @@ public class PlayerManager : MonoBehaviour {
 			distanceTraveled += forwardVelocity * Time.deltaTime;
 			timeElapsedText.text = TimeSpan.FromSeconds(timeElapsed).ToString("m':'ss'.'f");
 			distanceTraveledText.text = String.Format("{0:F1} m", Mathf.Round(distanceTraveled * 10) / 10f);
+			currentSpeedText.text = String.Format("{0:F1} m/s", Mathf.Round(forwardVelocity * 10) / 10f);
 		}
 
 		if (Input.GetKeyDown(KeyCode.Escape) && !GameManager.instance.isGameOver) {
@@ -110,17 +116,11 @@ public class PlayerManager : MonoBehaviour {
 			Time.timeScale = isPaused ? 0 : 1;
 		}
 
-		//if (Input.GetKeyDown(KeyCode.R)) {
-		//	IncreaseHealth(1);
-		//} else if (Input.GetKeyDown(KeyCode.Space)) {
-		//	IncreaseHealth(-1);
-		//}
+
 	}
 
 	public void StartMoving() {
-		print("Start acceleration routine");
 		StartCoroutine(StartAccelerating());
-		print("Start camera routine");
 		StartCoroutine(PanCameraBackward());
 	}
 
@@ -133,6 +133,7 @@ public class PlayerManager : MonoBehaviour {
 		pointsText.gameObject.SetActive(true);
 		timeElapsedText.gameObject.SetActive(true);
 		distanceTraveledText.gameObject.SetActive(true);
+		currentSpeedText.gameObject.SetActive(true);
 		yield return new WaitForSeconds(timeUntilAccelerationStart);
 		acceleration = startingAcceleration;
 		anim.SetFloat("Speed_f", 0.6f);
@@ -141,7 +142,7 @@ public class PlayerManager : MonoBehaviour {
 	IEnumerator StartInvincibilityTimer() {
 		isInvincible = true;
 		obtainInvincibilityParticleExplosion.Play();
-		GameManager.instance.GetAudioSource().PlayOneShot(invincibilityObtainedSound);
+		GameManager.instance.GetAudioSource().PlayOneShot(invincibilityObtainedSound, 0.9f);
 		foreach (GameObject indicator in invincibilityIndicators) {
 			indicator.SetActive(true);
 		}
@@ -160,9 +161,11 @@ public class PlayerManager : MonoBehaviour {
 
 	public void IncreaseHealth(int amnt, bool isInstaKill = false) {
 		if (health > 0 && (amnt > 0 || !isInvincible)) {
+			if (forwardVelocity > topSpeed)
+				topSpeed = forwardVelocity;
 			if (isInstaKill) {
 				health = 0;
-				GameManager.instance.GetAudioSource().PlayOneShot(hurtSound);
+				GameManager.instance.GetAudioSource().PlayOneShot(hurtSound, 1.5f);
 			} else {
 				if (amnt < 0) {
 #if DEBUG_DAMAGE_VELOCITY_REDUCTION
@@ -188,21 +191,35 @@ public class PlayerManager : MonoBehaviour {
 					float u = v * hurtSpeedReduction + 3; // u is the point in time in the past where fxU is half the velocity of fxV
 					float fxU = startingForwardSpeed + acceleration * (u - timeUntilAccelerationStart);
 					float hxU = startingHorizontalSpeed + acceleration * horizontalAccelerationProportion * (u - timeUntilAccelerationStart);
+					float r = (v + u) * recoveryVelocityProportion; // Time that represents when the desired velocity would've been at
+					float fxR = startingForwardSpeed + acceleration * (r - timeUntilAccelerationStart);
+					//float hxR = startingHorizontalSpeed + acceleration * horizontalAccelerationProportion * (r - timeUntilAccelerationStart);
+					if (recoveryCoroutine != null)
+						StopCoroutine(recoveryCoroutine);
+					if (health + amnt > 0)  {
+						recoveryCoroutine = StartCoroutine(EnterRecovery(forwardVelocity - fxR));
+					}
 					timeElapsedV = u; // Set timeElapsedV to the appropriate rewound time, which is simply u
-					print($"Initial values:\nForward: {forwardVelocity}\nHorizontal: {horizontalMoveSpeed}\nCalculations:\nv: {v}\nu: {u}\nfxU: {fxU}\nfxV: {hxU}");
+					print($"Initial values:\nForward: {forwardVelocity}\nHorizontal: {horizontalMoveSpeed}\nCalculations:\nv: {v}\nu: {u}\nfxU: {fxU}\nfxV: {hxU}\nRecover velocity time/vel: {r}; {fxR}");
 					forwardVelocity = fxU;
 					horizontalMoveSpeed = hxU;
 #else
 					float u = timeElapsedV * hurtSpeedReduction + 3;
 					forwardVelocity = startingForwardSpeed + acceleration * (u - timeUntilAccelerationStart);
 					horizontalMoveSpeed = startingHorizontalSpeed + acceleration * horizontalAccelerationProportion * (u - timeUntilAccelerationStart);
+					if (recoveryCoroutine != null)
+						StopCoroutine(recoveryCoroutine);
+					if (health + amnt > 0) {
+						recoveryCoroutine = StartCoroutine(EnterRecovery(forwardVelocity - (startingForwardSpeed + acceleration * ((timeElapsedV + u) * recoveryVelocityProportion - timeUntilAccelerationStart))));
+					}
 					timeElapsedV = u;
 #endif
 					if (forwardVelocity < startingForwardSpeed)
 						forwardVelocity = startingForwardSpeed;
 					if (horizontalMoveSpeed < startingHorizontalSpeed)
 						horizontalMoveSpeed = startingHorizontalSpeed;
-					GameManager.instance.GetAudioSource().PlayOneShot(hurtSound);
+
+					GameManager.instance.GetAudioSource().PlayOneShot(hurtSound, 1.5f);
 				} else {
 					obtainHealthParticleExplosion.Play();
 					GameManager.instance.GetAudioSource().PlayOneShot(healthObtainedSound);
@@ -218,6 +235,8 @@ public class PlayerManager : MonoBehaviour {
 				Time.timeScale = 1;
 				isPaused = false;
 				pausePanel.SetActive(false);
+				if (recoveryCoroutine != null)
+					StopCoroutine(recoveryCoroutine);
 
 				acceleration = 0;
 				forwardVelocity = 0;
@@ -233,11 +252,43 @@ public class PlayerManager : MonoBehaviour {
 		}
 	}
 
+	IEnumerator EnterRecovery(float velocityToRecoverTo) {
+		print("Recovery begin");
+		if (redfadeCoroutine != null)
+			StopCoroutine(redfadeCoroutine);
+		redfadeCoroutine = StartCoroutine(StartRedFade());
+		acceleration = velocityToRecoverTo / recoveryDuration;
+#if DEBUG_DAMAGE_VELOCITY_REDUCTION
+		print($"Recovery acceleration: {acceleration}");
+#endif
+		yield return new WaitForSeconds(recoveryDuration);
+#if DEBUG_DAMAGE_VELOCITY_REDUCTION
+		print($"FINISHED RECOVERY. Forward velocity: {forwardVelocity}");
+#endif
+		print("Recovery over");
+		acceleration = startingAcceleration;
+		recoveryCoroutine = null;
+	}
+
+	IEnumerator StartRedFade() {
+		Material mat = gameObject.GetComponentInChildren<Renderer>().materials[1];
+		float timePassed = 0;
+		Color c = new Color(1, 0, 0, 1);
+		mat.color = c;
+		while (timePassed < recoveryDuration) {
+			yield return null;
+			timePassed += Time.deltaTime;
+			c.a = 1 - timePassed / recoveryDuration;
+			mat.color = c;
+		}
+		redfadeCoroutine = null;
+	}
+
 	public void IncreaseGemCount(int amnt) {
 		gemsCollected += amnt;
 		pointsText.text = $"Gems: {gemsCollected}";
 		obtainGemParticleExplosion.Play();
-		GameManager.instance.GetAudioSource().PlayOneShot(gemCollectSound);
+		GameManager.instance.GetAudioSource().PlayOneShot(gemCollectSound, 0.75f);
 	}
 
 	IEnumerator PanCameraBackward() {
@@ -254,9 +305,11 @@ public class PlayerManager : MonoBehaviour {
 		pointsText.gameObject.SetActive(false);
 		timeElapsedText.gameObject.SetActive(false);
 		distanceTraveledText.gameObject.SetActive(false);
+		currentSpeedText.gameObject.SetActive(false);
 
 		gameoverGemsText.text = "" + gemsCollected;
 		gameoverDistanceText.text = String.Format("{0:F1} m", Mathf.Round(distanceTraveled * 10) / 10f);
+		topSpeedText.text = String.Format("{0:F1} m/s", Mathf.Round(topSpeed * 10) / 10f);
 		gameoverTimeText.text = TimeSpan.FromSeconds(timeElapsed).ToString("m':'ss'.'f");
 	}
 
